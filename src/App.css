@@ -1,61 +1,132 @@
 body {
   margin: 0;
-  padding: 0;
-  background: #0f172a;
   font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(135deg, #020617, #0f172a);
   color: white;
 }
 
-.container {
+.contenedor {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-}
-
-h1 {
-  font-size: 40px;
-  margin-bottom: 10px;
-}
-
-.subtitulo {
-  color: #94a3b8;
-  margin-bottom: 30px;
+  align-items: center;
+  padding: 40px;
 }
 
 .card {
-  background: #1e293b;
-  padding: 30px;
-  border-radius: 20px;
-  width: 400px;
+  width: 850px;
+  background: #111827;
+  border-radius: 24px;
+  padding: 35px;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.12);
   text-align: center;
-  box-shadow: 0px 0px 20px rgba(0,0,0,0.3);
 }
 
-input {
-  margin-bottom: 20px;
+h1 {
+  font-size: 36px;
+  margin-bottom: 10px;
+  color: #38bdf8;
 }
 
-.preview img {
-  width: 100%;
-  border-radius: 10px;
-  margin-top: 15px;
+.descripcion {
+  color: #cbd5e1;
+  margin-bottom: 25px;
 }
 
-button {
-  margin-top: 20px;
-  background: #06b6d4;
-  color: black;
-  border: none;
+.arquitectura {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  background: #020617;
   padding: 15px;
-  border-radius: 10px;
-  cursor: pointer;
-  width: 100%;
+  border-radius: 14px;
+  margin-bottom: 25px;
+  color: #67e8f9;
   font-weight: bold;
+}
+
+.pasos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.paso {
+  background: #1e293b;
+  padding: 14px;
+  border-radius: 12px;
+  color: #e2e8f0;
+  font-weight: bold;
+}
+
+.boton-subir,
+.boton-procesar {
+  display: inline-block;
+  background: #06b6d4;
+  color: #020617;
+  padding: 15px 25px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  border: none;
+  margin: 10px;
   font-size: 16px;
 }
 
-button:hover {
+.boton-subir:hover,
+.boton-procesar:hover {
   background: #22d3ee;
+}
+
+.info-archivo {
+  background: #020617;
+  margin: 20px auto;
+  padding: 20px;
+  border-radius: 16px;
+  text-align: left;
+  max-width: 500px;
+  border: 1px solid #334155;
+}
+
+.info-archivo h3 {
+  color: #38bdf8;
+}
+
+.mensaje {
+  margin: 20px auto;
+  padding: 14px;
+  background: #1e293b;
+  border-radius: 12px;
+  max-width: 500px;
+  color: #e2e8f0;
+}
+
+.preview {
+  margin-top: 20px;
+}
+
+.preview img {
+  max-width: 100%;
+  max-height: 350px;
+  border-radius: 18px;
+  border: 2px solid #38bdf8;
+}
+
+@media (max-width: 768px) {
+  .card {
+    width: 100%;
+  }
+
+  .pasos {
+    grid-template-columns: 1fr;
+  }
+
+  .arquitectura {
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
 }
