@@ -1,16 +1,38 @@
-# React + Vite
+# Sistema de Optimización de Imágenes en la Nube
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación React + Vite para **subir múltiples imágenes** y guardarlas en **Amazon S3** usando **Lambda** (URLs prefirmadas) y **API Gateway**.
 
-Currently, two official plugins are available:
+## Inicio rápido (frontend)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+cp .env.example .env
+# Edita .env con tu URL de API Gateway y nombre del bucket
+npm run dev
+```
 
-## React Compiler
+## Arquitectura
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+Usuario → React (multi-file)
+       → POST API Gateway
+       → Lambda genera presigned URL
+       → PUT directo a S3
+       → Logs en CloudWatch
+```
 
-## Expanding the ESLint configuration
+## Configuración AWS
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Instrucciones detalladas: [aws/README.md](aws/README.md)
+
+## Scripts
+
+| Comando        | Descripción        |
+|----------------|--------------------|
+| `npm run dev`  | Servidor desarrollo |
+| `npm run build`| Build producción   |
+| `npm run lint` | ESLint             |
+
+## Variables de entorno
+
+Ver [.env.example](.env.example).
