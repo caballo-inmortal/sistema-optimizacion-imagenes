@@ -1,4 +1,4 @@
-import { AwsConfig } from "../config/AwsConfig.js";
+import { AwsConfig, ObtenerListApiUrl } from "../config/AwsConfig.js";
 
 function SubirConProgreso(url, archivo, contentType, onProgress) {
   return new Promise((resolve, reject) => {
@@ -20,7 +20,11 @@ function SubirConProgreso(url, archivo, contentType, onProgress) {
     });
 
     xhr.addEventListener("error", () => {
-      reject(new Error("Fallo la conexión al subir a S3."));
+      reject(
+        new Error(
+          "Fallo la conexión al subir a S3. Revisa CORS del bucket S3 (AllowedOrigins debe incluir tu localhost, ej. http://localhost:5175)."
+        )
+      );
     });
 
     xhr.open("PUT", url);
@@ -41,9 +45,41 @@ export async function ObtenerUrlPrefirmada(archivo) {
 
   if (!respuesta.ok) {
     const detalle = await respuesta.text().catch(() => "");
-    throw new Error(
-      detalle || `API respondió con estado ${respuesta.status}`
-    );
+    const mensajeBase =
+      detalle || `API respondió con estado ${respuesta.status}`;
+    if (respuesta.status === 404) {
+      throw new Error(
+        `${mensajeBase}. Revisa VITE_UPLOAD_API_URL en .env (API Gateway → Stages → Invoke URL + /upload).`
+      );
+    }
+    throw new Error(mensajeBase);
+  }
+
+  return respuesta.json();
+}
+
+export async function ListarImagenesDesdeS3() {
+  const listUrl = ObtenerListApiUrl();
+  if (!listUrl) {
+    throw new Error("No se pudo derivar la URL /list desde VITE_UPLOAD_API_URL.");
+  }
+
+  const respuesta = await fetch(listUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  if (!respuesta.ok) {
+    const detalle = await respuesta.text().catch(() => "");
+    const mensajeBase =
+      detalle || `API respondió con estado ${respuesta.status}`;
+    if (respuesta.status === 404) {
+      throw new Error(
+        `${mensajeBase}. En API Gateway agrega la ruta POST /list apuntando a la Lambda.`
+      );
+    }
+    throw new Error(mensajeBase);
   }
 
   return respuesta.json();
@@ -62,18 +98,3 @@ export async function SubirImagenAS3(archivo, onProgress) {
   };
 }
 
-export async function SubirImagenesAS3(archivos, onProgresoItem) {
-  const resultados = [];
-
-  for (let indice = 0; indice < archivos.length; indice++) {
-    const archivo = archivos[indice];
-
-    const resultado = await SubirImagenAS3(archivo, (progreso) => {
-      onProgresoItem?.(indice, progreso);
-    });
-
-    resultados.push({ archivo, ...resultado });
-  }
-
-  return resultados;
-}

@@ -45,7 +45,7 @@ Empaqueta `index.mjs`, `node_modules` y sube a Lambda (Node.js 20.x).
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:PutObject"],
+      "Action": ["s3:PutObject", "s3:GetObject"],
       "Resource": "arn:aws:s3:::TU-BUCKET/uploads/*"
     }
   ]

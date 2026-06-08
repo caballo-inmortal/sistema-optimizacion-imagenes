@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
+import { ObtenerFaltantesConfiguracion } from "./config/AwsConfig.js";
+import { useGaleriaS3 } from "./hooks/useGaleriaS3.js";
 import { useMultiImageUpload } from "./hooks/useMultiImageUpload.js";
 import { FormatearTamano } from "./utils/ImageValidation.js";
 import "./App.css";
@@ -19,34 +21,66 @@ function EtiquetaEstado({ estado }) {
 }
 
 function ObtenerUrlVisualizacion(item) {
-  return item.viewUrl || item.previewUrl;
+  return item.viewUrl || item.previewUrl || "";
+}
+
+function ObtenerNombreImagen(item) {
+  return item.nombre || item.archivo?.name || "Imagen";
+}
+
+function ObtenerTamanoImagen(item) {
+  if (typeof item.tamano === "number") return item.tamano;
+  return item.archivo?.size ?? 0;
 }
 
 function App() {
+  const [galeriaAbierta, setGaleriaAbierta] = useState(false);
+  const [imagenAmpliada, setImagenAmpliada] = useState(null);
+
+  const galeria = useGaleriaS3();
+
   const {
     imagenes,
     mensaje,
     subiendo,
     pendientes,
-    completadas,
+    fallidas,
     awsConfigurado,
+    procesarArchivos,
     seleccionarImagenes,
     eliminarImagen,
-    limpiarCompletadas,
     subirTodas,
-  } = useMultiImageUpload();
+  } = useMultiImageUpload({
+    onSubidaExitosa: galeria.registrarSubidas,
+  });
 
-  const [galeriaAbierta, setGaleriaAbierta] = useState(false);
-  const [imagenAmpliada, setImagenAmpliada] = useState(null);
+  const [arrastrando, setArrastrando] = useState(false);
 
-  const imagenesSubidas = useMemo(
-    () => imagenes.filter((i) => i.estado === "exito"),
-    [imagenes]
+  const manejarDragOver = useCallback((e) => {
+    e.preventDefault();
+    setArrastrando(true);
+  }, []);
+
+  const manejarDragLeave = useCallback((e) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setArrastrando(false);
+    }
+  }, []);
+
+  const manejarDrop = useCallback(
+    (e) => {
+      e.preventDefault();
+      setArrastrando(false);
+      procesarArchivos(Array.from(e.dataTransfer.files ?? []));
+    },
+    [procesarArchivos]
   );
 
   const abrirGaleria = () => {
-    if (completadas === 0) return;
+    if (!awsConfigurado) return;
     setGaleriaAbierta(true);
+    galeria.cargarDesdeS3();
   };
 
   return (
@@ -80,12 +114,27 @@ function App() {
 
           {!awsConfigurado && (
             <div className="AvisoConfig">
-              Configura <code>.env</code> con la URL de API Gateway y el bucket
-              S3.
+              Configura <code>.env</code> en la raíz del proyecto y reinicia{" "}
+              <code>npm run dev</code>.
+              {ObtenerFaltantesConfiguracion().length > 0 && (
+                <>
+                  {" "}
+                  Faltan:{" "}
+                  <code>{ObtenerFaltantesConfiguracion().join(", ")}</code>.
+                </>
+              )}
+              <br />
+              Guía AWS: <code>aws/GUIA-CONFIGURACION-AWS.md</code>
             </div>
           )}
 
-          <div className="ZonaArrastre">
+          <div
+            className={`ZonaArrastre${arrastrando ? " ZonaArrastre--activa" : ""}`}
+            onDragOver={manejarDragOver}
+            onDragEnter={manejarDragOver}
+            onDragLeave={manejarDragLeave}
+            onDrop={manejarDrop}
+          >
             <div className="ZonaArrastreIcono">📸</div>
             <p className="ZonaArrastreTexto">
               Selecciona una o varias imágenes para subir a Amazon S3
@@ -116,7 +165,7 @@ function App() {
             </div>
             <div className="Estadistica">
               <span className="EstadisticaValor EstadisticaValor--verde">
-                {completadas}
+                {galeria.cargando ? "…" : galeria.total}
               </span>
               <span className="EstadisticaEtiqueta">En S3</span>
             </div>
@@ -138,18 +187,29 @@ function App() {
               type="button"
               className="Boton Boton--galeria"
               onClick={abrirGaleria}
-              disabled={completadas === 0}
+              disabled={!awsConfigurado}
             >
-              Ver imágenes subidas ({completadas})
+              Ver imágenes en S3 ({galeria.cargando ? "…" : galeria.total})
             </button>
 
-            {completadas > 0 && !subiendo && (
+            {fallidas > 0 && !subiendo && (
+              <button
+                type="button"
+                className="Boton Boton--reintentar"
+                onClick={subirTodas}
+              >
+                Reintentar {fallidas} fallida(s)
+              </button>
+            )}
+
+            {awsConfigurado && !subiendo && (
               <button
                 type="button"
                 className="Boton Boton--fantasma"
-                onClick={limpiarCompletadas}
+                onClick={galeria.cargarDesdeS3}
+                disabled={galeria.cargando}
               >
-                Limpiar subidas
+                {galeria.cargando ? "Actualizando…" : "Actualizar galería"}
               </button>
             )}
           </div>
@@ -227,20 +287,41 @@ function App() {
             <div className="GaleriaCabecera">
               <div>
                 <h2>Galería en la nube</h2>
-                <p>{imagenesSubidas.length} imagen(es) guardadas en S3</p>
+                <p>
+                  {galeria.cargando
+                    ? "Cargando imágenes desde S3…"
+                    : `${galeria.total} imagen(es) en el bucket`}
+                </p>
               </div>
-              <button
-                type="button"
-                className="Boton Boton--cerrar"
-                onClick={() => setGaleriaAbierta(false)}
-              >
-                Cerrar
-              </button>
+              <div className="GaleriaCabeceraAcciones">
+                <button
+                  type="button"
+                  className="Boton Boton--fantasma"
+                  onClick={galeria.cargarDesdeS3}
+                  disabled={galeria.cargando}
+                >
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  className="Boton Boton--cerrar"
+                  onClick={() => setGaleriaAbierta(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
 
+            {!galeria.cargando && galeria.total === 0 && (
+              <div className="ColaVacia GaleriaVacia">
+                <span>☁️</span>
+                <p>Aún no hay imágenes para mostrar</p>
+              </div>
+            )}
+
             <div className="GaleriaGrid">
-              {imagenesSubidas.map((item) => (
-                <article key={item.id} className="GaleriaTarjeta">
+              {galeria.imagenes.map((item) => (
+                <article key={item.key} className="GaleriaTarjeta">
                   <button
                     type="button"
                     className="GaleriaTarjetaImagen"
@@ -248,16 +329,16 @@ function App() {
                   >
                     <img
                       src={ObtenerUrlVisualizacion(item)}
-                      alt={item.archivo.name}
-                      onError={(e) => {
-                        e.currentTarget.src = item.previewUrl;
-                      }}
+                      alt={ObtenerNombreImagen(item)}
+                      loading="lazy"
                     />
                     <span className="GaleriaTarjetaHover">Ampliar</span>
                   </button>
                   <div className="GaleriaTarjetaInfo">
-                    <p title={item.archivo.name}>{item.archivo.name}</p>
-                    <small>{FormatearTamano(item.archivo.size)}</small>
+                    <p title={ObtenerNombreImagen(item)}>
+                      {ObtenerNombreImagen(item)}
+                    </p>
+                    <small>{FormatearTamano(ObtenerTamanoImagen(item))}</small>
                   </div>
                 </article>
               ))}
@@ -286,22 +367,28 @@ function App() {
             </button>
             <img
               src={ObtenerUrlVisualizacion(imagenAmpliada)}
-              alt={imagenAmpliada.archivo.name}
-              onError={(e) => {
-                e.currentTarget.src = imagenAmpliada.previewUrl;
-              }}
+              alt={ObtenerNombreImagen(imagenAmpliada)}
             />
             <div className="LightboxPie">
-              <strong>{imagenAmpliada.archivo.name}</strong>
+              <strong>{ObtenerNombreImagen(imagenAmpliada)}</strong>
               {imagenAmpliada.viewUrl && (
-                <a
-                  href={imagenAmpliada.viewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="LightboxEnlace"
-                >
-                  Abrir en nueva pestaña
-                </a>
+                <div className="LightboxAcciones">
+                  <a
+                    href={imagenAmpliada.viewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="LightboxEnlace"
+                  >
+                    Abrir en nueva pestaña
+                  </a>
+                  <a
+                    href={imagenAmpliada.viewUrl}
+                    download={ObtenerNombreImagen(imagenAmpliada)}
+                    className="LightboxEnlace LightboxEnlace--descarga"
+                  >
+                    Descargar
+                  </a>
+                </div>
               )}
             </div>
           </div>

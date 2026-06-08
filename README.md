@@ -23,7 +23,9 @@ Usuario → React (multi-file)
 
 ## Configuración AWS
 
-Instrucciones detalladas: [aws/README.md](aws/README.md)
+1. **Empieza aquí (fácil):** [aws/PASO-A-PASO.md](aws/PASO-A-PASO.md)
+2. Guía técnica completa: [aws/GUIA-CONFIGURACION-AWS.md](aws/GUIA-CONFIGURACION-AWS.md)
+2. Referencia técnica Lambda/API: [aws/README.md](aws/README.md)
 
 ## Scripts
 
@@ -35,4 +37,12 @@ Instrucciones detalladas: [aws/README.md](aws/README.md)
 
 ## Variables de entorno
 
-Ver [.env.example](.env.example).
+Ver [.env.example](.env.example). Región actual del despliegue: **us-east-2**.
+
+```env
+VITE_UPLOAD_API_URL=https://TU-API-ID.execute-api.us-east-2.amazonaws.com/upload
+VITE_S3_BUCKET=cloudpix-fredy-2026-866017706103-us-east-2-an
+VITE_AWS_REGION=us-east-2
+```
+
+La **Invoke URL** se copia en API Gateway → `cloudpix-upload-api` → Stages → `$default`.

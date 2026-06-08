@@ -5,9 +5,14 @@ export const FormatosPermitidos = [
 ];
 
 export const MaximoImagenes = 50;
+export const TamanoMaximoBytes = 10 * 1024 * 1024; // 10 MB
 
 export function EsImagenValida(archivo) {
   return FormatosPermitidos.includes(archivo.type);
+}
+
+export function EsTamanoValido(archivo) {
+  return archivo.size <= TamanoMaximoBytes;
 }
 
 export function FormatearTamano(bytes) {
