@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import { ObtenerFaltantesConfiguracion } from "./config/AwsConfig.js";
+import { PantallaLogin } from "./components/PantallaLogin.jsx";
+import { useAuth } from "./hooks/useAuth.js";
 import { useGaleriaS3 } from "./hooks/useGaleriaS3.js";
 import { useMultiImageUpload } from "./hooks/useMultiImageUpload.js";
 import { FormatearTamano } from "./utils/ImageValidation.js";
@@ -34,6 +36,17 @@ function ObtenerTamanoImagen(item) {
 }
 
 function App() {
+  const {
+    usuario,
+    cargando: cargandoAuth,
+    error: errorAuth,
+    setError: setErrorAuth,
+    requiereNuevaContrasena,
+    login,
+    completarNuevaContrasena,
+    logout,
+  } = useAuth();
+
   const [galeriaAbierta, setGaleriaAbierta] = useState(false);
   const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
@@ -83,6 +96,27 @@ function App() {
     galeria.cargarDesdeS3();
   };
 
+  if (cargandoAuth) {
+    return (
+      <div className="AppCargando">
+        <span className="AppCargandoIcono">☁</span>
+        <p>Verificando sesión…</p>
+      </div>
+    );
+  }
+
+  if (!usuario) {
+    return (
+      <PantallaLogin
+        onLogin={login}
+        onCompletarNuevaContrasena={completarNuevaContrasena}
+        requiereNuevaContrasena={requiereNuevaContrasena}
+        error={errorAuth}
+        setError={setErrorAuth}
+      />
+    );
+  }
+
   return (
     <div className="App">
       <div className="AppFondo" aria-hidden="true">
@@ -92,11 +126,23 @@ function App() {
       </div>
 
       <header className="AppCabecera">
-        <div className="AppMarca">
-          <span className="AppLogo">☁</span>
-          <div>
-            <p className="AppMarcaEtiqueta">AWS · S3 · Lambda</p>
-            <h1 className="AppTitulo">CloudPix Studio</h1>
+        <div className="AppCabeceraTop">
+          <div className="AppMarca">
+            <span className="AppLogo">☁</span>
+            <div>
+              <p className="AppMarcaEtiqueta">AWS · S3 · Lambda</p>
+              <h1 className="AppTitulo">CloudPix Studio</h1>
+            </div>
+          </div>
+          <div className="AppSesion">
+            <span className="AppSesionEmail">{usuario.email}</span>
+            <button
+              type="button"
+              className="Boton Boton--fantasma AppSesionSalir"
+              onClick={logout}
+            >
+              Cerrar sesión
+            </button>
           </div>
         </div>
         <p className="AppSubtitulo">

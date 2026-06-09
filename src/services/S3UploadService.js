@@ -1,4 +1,12 @@
 import { AwsConfig, ObtenerListApiUrl } from "../config/AwsConfig.js";
+import { ObtenerToken } from "./AuthService.js";
+
+async function ObtenerHeaders() {
+  const token = await ObtenerToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
 
 function SubirConProgreso(url, archivo, contentType, onProgress) {
   return new Promise((resolve, reject) => {
@@ -36,7 +44,7 @@ function SubirConProgreso(url, archivo, contentType, onProgress) {
 export async function ObtenerUrlPrefirmada(archivo) {
   const respuesta = await fetch(AwsConfig.UploadApiUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await ObtenerHeaders(),
     body: JSON.stringify({
       fileName: archivo.name,
       contentType: archivo.type,
@@ -66,7 +74,7 @@ export async function ListarImagenesDesdeS3() {
 
   const respuesta = await fetch(listUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await ObtenerHeaders(),
     body: JSON.stringify({}),
   });
 

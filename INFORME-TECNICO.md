@@ -7,8 +7,8 @@
 | **Proyecto** | sistema-optimizacion-imagenes |
 | **Aplicación** | CloudPix Studio |
 | **Cuenta AWS** | `866017706103` |
-| **Fecha del informe** | 3 de junio de 2026 |
-| **Estado** | Operativo en desarrollo local (subida a S3 verificada) |
+| **Fecha del informe** | 9 de junio de 2026 (actualizado) |
+| **Estado** | Operativo — login Cognito, subida S3, galería completa verificados |
 
 ---
 
@@ -596,3 +596,240 @@ Usuario     React          API GW        Lambda         S3
 ---
 
 *Documento generado como referencia técnica del proyecto CloudPix Studio. Para cambios en infraestructura AWS, actualizar este informe y `TODO.md`.*
+
+---
+
+## Anexo C — Mejoras implementadas el 8 de junio de 2026
+
+### C.1 Resumen de la sesión
+
+En esta sesión se realizaron mejoras significativas al proyecto en tres áreas: **corrección de bugs**, **mejoras de UX/funcionalidad en el frontend** y **autenticación con AWS Cognito**.
+
+---
+
+### C.2 Corrección de bugs
+
+#### Bug crítico — `galeria.cargar()` no existía
+
+| Campo | Detalle |
+|-------|---------|
+| **Archivo** | `src/App.jsx` línea 58 |
+| **Problema** | Se llamaba `galeria.cargar()` pero el hook `useGaleriaS3` exporta `cargarDesdeS3`. Llamar una función `undefined` lanzaba un `TypeError` cada vez que el usuario abría la galería. |
+| **Solución** | Renombrado a `galeria.cargarDesdeS3()` |
+| **Impacto** | La galería era completamente inutilizable antes de este fix. |
+
+---
+
+### C.3 Mejoras de funcionalidad en el frontend
+
+#### C.3.1 Drag & Drop real
+
+Antes, la zona de carga decía "Arrastra o selecciona" pero solo funcionaba el botón de selección. Se implementaron los eventos necesarios:
+
+| Evento | Función |
+|--------|---------|
+| `onDragOver` / `onDragEnter` | Activa estado visual y previene comportamiento por defecto del navegador |
+| `onDragLeave` | Desactiva estado visual solo cuando el cursor sale de la zona (no de elementos hijos) |
+| `onDrop` | Extrae archivos del evento y los procesa con `procesarArchivos()` |
+
+Se agregó la clase `.ZonaArrastre--activa` en `App.css` con fondo naranja y borde sólido para feedback visual durante el arrastre.
+
+La lógica de validación se extrajo del evento `onChange` a una función independiente `procesarArchivos(archivos: File[])` en `useMultiImageUpload.js`, reutilizable desde el input y desde el drop.
+
+#### C.3.2 Límite de tamaño de archivo (10 MB)
+
+Se agregaron dos exportaciones en `src/utils/ImageValidation.js`:
+
+```js
+export const TamanoMaximoBytes = 10 * 1024 * 1024; // 10 MB
+export function EsTamanoValido(archivo) {
+  return archivo.size <= TamanoMaximoBytes;
+}
+```
+
+La validación se ejecuta en `procesarArchivos()` antes de agregar imágenes a la cola. Si algún archivo supera el límite, se muestra un mensaje de error y se rechaza el lote completo.
+
+#### C.3.3 Botón "Reintentar fallidas"
+
+Se agregó un contador `fallidas` al hook `useMultiImageUpload` (imágenes en estado `"error"`). En `App.jsx` aparece un botón rojo **"Reintentar X fallida(s)"** cuando `fallidas > 0` y no hay una subida en curso. Reutiliza la función `subirTodas()` que ya incluye las imágenes en estado `"error"` en su lista de pendientes.
+
+#### C.3.4 Descarga en el lightbox
+
+Se agregó un enlace de descarga en el pie del lightbox junto al ya existente "Abrir en nueva pestaña":
+
+```jsx
+<a href={imagenAmpliada.viewUrl} download={ObtenerNombreImagen(imagenAmpliada)}>
+  Descargar
+</a>
+```
+
+Se creó la clase `.LightboxEnlace--descarga` (color verde) para diferenciarlo visualmente del enlace de visualización.
+
+#### C.3.5 Eliminación de código muerto
+
+La función `SubirImagenesAS3` en `src/services/S3UploadService.js` nunca fue importada ni utilizada en ningún archivo del proyecto. Se eliminó para reducir superficie de código sin funcionalidad.
+
+---
+
+### C.4 Autenticación con AWS Cognito
+
+#### C.4.1 Motivación
+
+La aplicación no tenía ningún control de acceso — cualquier persona con la URL podía subir imágenes al bucket S3. Se implementó autenticación completa con **AWS Cognito** para proteger toda la aplicación.
+
+#### C.4.2 Infraestructura AWS creada
+
+| Recurso | Detalle |
+|---------|---------|
+| **User Pool** | `us-east-2_bHyMb4xWL` |
+| **App Client** | `tqv7m0tkb803r8skou1en4jsa` (Public client, sin secret) |
+| **Atributo de login** | Email |
+| **Confirmación** | Administrador establece contraseña desde consola |
+
+#### C.4.3 Nuevos archivos creados
+
+| Archivo | Responsabilidad |
+|---------|-----------------|
+| `src/config/CognitoConfig.js` | Lee `VITE_COGNITO_USER_POOL_ID` y `VITE_COGNITO_CLIENT_ID` del `.env` |
+| `src/services/AuthService.js` | `IniciarSesion`, `CompletarNuevaContrasena`, `CerrarSesion`, `ObtenerSesionActual`, `ObtenerToken` |
+| `src/hooks/useAuth.js` | Estado reactivo de sesión: `usuario`, `cargando`, `error`, `requiereNuevaContrasena` |
+| `src/components/PantallaLogin.jsx` | Formulario de login y formulario de cambio de contraseña (paso 2) |
+| `src/components/PantallaLogin.css` | Estilos del login con branding CloudPix (orbes animados, glassmorphism) |
+
+#### C.4.4 Flujo de autenticación
+
+```
+App carga
+    │
+    ├─ Verifica sesión existente (ObtenerSesionActual)
+    │       │
+    │       ├─ Sesión válida → muestra la app
+    │       └─ Sin sesión → muestra PantallaLogin
+    │
+Usuario ingresa email + contraseña temporal
+    │
+    ├─ Cognito: credenciales OK → sesión activa → muestra la app
+    ├─ Cognito: newPasswordRequired → muestra Paso 2 (nueva contraseña)
+    │       └─ Usuario establece contraseña permanente → sesión activa
+    └─ Cognito: error → muestra mensaje descriptivo en pantalla
+```
+
+#### C.4.5 Token JWT en las peticiones API
+
+Tras el login, el token `IdToken` de Cognito se adjunta automáticamente en cada llamada a API Gateway:
+
+```
+Authorization: Bearer <JWT>
+```
+
+Esto se realiza en `S3UploadService.js` mediante la función `ObtenerHeaders()` que llama a `ObtenerToken()` antes de cada fetch.
+
+#### C.4.6 Dependencia instalada
+
+```bash
+npm install amazon-cognito-identity-js
+```
+
+Se requirió agregar `global: 'globalThis'` en `vite.config.js` ya que esta librería usa la variable global `global` de Node.js, que no existe en el navegador.
+
+---
+
+### C.5 Solución CORS con proxy Vite
+
+Las peticiones directas desde el navegador a API Gateway eran bloqueadas por política CORS. Se configuró un **proxy en Vite** que evita el problema sin modificar la configuración de AWS:
+
+```js
+// vite.config.js
+server: {
+  proxy: {
+    '/api-gw': {
+      target: 'https://jf5qia58x7.execute-api.us-east-1.amazonaws.com',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api-gw/, ''),
+    }
+  }
+}
+```
+
+La variable de entorno se cambió de URL absoluta a ruta relativa:
+```
+VITE_UPLOAD_API_URL=/api-gw/upload
+```
+
+El proxy cubre automáticamente `/api-gw/upload` → `/upload` y `/api-gw/list` → `/list`.
+
+> **Nota:** Este proxy solo aplica en desarrollo local. Para producción se deberá configurar CORS correctamente en API Gateway o usar un dominio propio con certificado.
+
+---
+
+### C.6 Galería S3 completa (POST /list)
+
+#### Situación anterior
+
+La galería solo mostraba imágenes subidas en la sesión actual del navegador (almacenadas en `sessionStorage`). Al cerrar y reabrir el navegador, la galería aparecía vacía.
+
+#### Solución implementada
+
+| Paso | Acción |
+|------|--------|
+| **API Gateway** | Ruta `POST /list` creada y asociada a la misma Lambda `presigned-url-imagenes` |
+| **IAM** | Política inline `ListBucketCloudPix` con permiso `s3:ListBucket` agregada al rol de Lambda |
+| **Lambda** | Código actualizado con función `ListarImagenes()` que ejecuta `ListObjectsV2Command` y genera URLs firmadas de lectura para cada objeto |
+| **Frontend** | Ya tenía implementado `ListarImagenesDesdeS3()` en `S3UploadService.js` — entró en funcionamiento automáticamente |
+
+#### Flujo de la galería
+
+```
+Usuario → "Ver imágenes en S3"
+    → POST /api-gw/list (proxy Vite)
+    → POST /list (API Gateway)
+    → Lambda: ListObjectsV2(bucket, prefix="uploads/")
+    → Por cada objeto: getSignedUrl(GetObjectCommand, expiresIn=3600)
+    → Respuesta: [{ key, viewUrl, nombre, tamano, fecha }]
+    → React: renderiza grid con lazy loading
+```
+
+---
+
+### C.7 Variables de entorno actualizadas
+
+```env
+# Proxy Vite (desarrollo)
+VITE_UPLOAD_API_URL=/api-gw/upload
+
+# AWS Cognito
+VITE_COGNITO_USER_POOL_ID=us-east-2_bHyMb4xWL
+VITE_COGNITO_CLIENT_ID=tqv7m0tkb803r8skou1en4jsa
+```
+
+---
+
+### C.8 Estado funcional tras las mejoras
+
+| Funcionalidad | Estado |
+|---------------|--------|
+| Login con AWS Cognito | ✅ Operativo |
+| Cambio de contraseña temporal (primer acceso) | ✅ Operativo |
+| Cerrar sesión | ✅ Operativo |
+| Drag & Drop de imágenes | ✅ Operativo |
+| Validación de formato (JPG, PNG, WebP) | ✅ Operativo |
+| Validación de tamaño (máx. 10 MB) | ✅ Operativo |
+| Subida a S3 con barra de progreso | ✅ Operativo |
+| Reintentar imágenes fallidas | ✅ Operativo |
+| Galería con todas las imágenes del bucket | ✅ Operativo |
+| Lightbox con descarga | ✅ Operativo |
+| Token JWT en peticiones API | ✅ Operativo |
+
+---
+
+### C.9 Historial de infraestructura AWS — 8 de junio 2026
+
+| Hora | Evento |
+|------|--------|
+| 15:08 | User Pool `us-east-2_bHyMb4xWL` creado en Cognito |
+| 15:09 | App Client `tqv7m0tkb803r8skou1en4jsa` configurado (Public, sin secret) |
+| 16:09 | URL de API Gateway corregida a `jf5qia58x7.execute-api.us-east-1.amazonaws.com` |
+| 16:32 | Proxy Vite configurado — CORS resuelto |
+| 17:52 | Ruta `POST /list` creada en API Gateway con integración `7eju0rb` |
+| 18:01 | Política `ListBucketCloudPix` agregada al rol `presigned-url-imagenes-role-y7rfhqww` |
+| 18:17 | Lambda actualizada con código de listado — galería muestra 9 imágenes del bucket |

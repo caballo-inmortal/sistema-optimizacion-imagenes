@@ -14,6 +14,22 @@
 - [x] **Descarga en lightbox**: enlace "Descargar" junto a "Abrir en nueva pestaña" con atributo `download`.
 - [x] **Código muerto eliminado**: `SubirImagenesAS3` removida de `S3UploadService.js` (no se usaba).
 
+## 2026-06-08 — Login con AWS Cognito
+
+- [x] Instalado `amazon-cognito-identity-js`.
+- [x] `src/config/CognitoConfig.js`: lee `VITE_COGNITO_USER_POOL_ID` y `VITE_COGNITO_CLIENT_ID` desde `.env`.
+- [x] `src/services/AuthService.js`: `IniciarSesion`, `CerrarSesion`, `ObtenerSesionActual`, `ObtenerToken`.
+- [x] `src/hooks/useAuth.js`: estado de sesión, login y logout reactivos.
+- [x] `src/components/PantallaLogin.jsx` + `PantallaLogin.css`: pantalla de acceso con branding CloudPix.
+- [x] `App.jsx`: guard de autenticación (spinner → login → app), email del usuario + botón "Cerrar sesión" en el header.
+- [x] `S3UploadService.js`: token JWT de Cognito enviado en header `Authorization` en cada llamada a la API.
+- [x] `.env.example` actualizado con variables de Cognito.
+- [x] User Pool creado en Cognito (`us-east-2_bHyMb4xWL`) + App Client configurado.
+- [x] Proxy Vite (`/api-gw`) para evitar CORS en desarrollo — `VITE_UPLOAD_API_URL=/api-gw/upload`.
+- [x] `vite.config.js`: `global: 'globalThis'` para compatibilidad de `amazon-cognito-identity-js` en el navegador.
+- [x] `useAuth.js`: try/catch en `login` y `completarNuevaContrasena` para mostrar errores en pantalla.
+- [x] Flujo `newPasswordRequired` implementado: paso 2 en el login para usuarios con contraseña temporal de Cognito.
+
 ## 2026-06-03 (tarde)
 
 - [x] `.env` y `.env.example` actualizados: bucket `cloudpix-fredy-2026-866017706103-us-east-2-an`, región `us-east-2`.
@@ -23,7 +39,10 @@
 - [x] `.env` con `VITE_UPLOAD_API_URL` → `jf5qia58x7.execute-api.us-east-1.amazonaws.com/upload`.
 - [x] CORS bucket S3 con localhost 5173–5175.
 - [x] Galería: respaldo con imágenes de sesión cuando POST `/list` falla (404).
-- [ ] TODO AWS: ruta API Gateway `POST /list` + permiso `s3:ListBucket` (ver `aws/LISTAR-IMAGENES-AWS.md`).
+- [x] Ruta `POST /list` creada en API Gateway + integración a Lambda existente.
+- [x] Política `ListBucketCloudPix` (`s3:ListBucket`) agregada al rol Lambda.
+- [x] Lambda actualizada con código que maneja `/list` y `/upload` en la misma función.
+- [x] Galería carga todas las imágenes reales del bucket S3.
 
 ## 2026-06-03
 

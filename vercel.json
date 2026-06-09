@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api-gw/:path*",
+      "destination": "https://jf5qia58x7.execute-api.us-east-1.amazonaws.com/:path*"
+    }
+  ]
+}
